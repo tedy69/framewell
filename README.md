@@ -39,12 +39,12 @@ Pages sites are public by default unless Cloudflare Access is separately configu
 - Reads a local browser-playable MP4, MOV, or WebM up to 250 MB.
 - Exports a selected clip up to 180 seconds as H.264 MP4 with optional AAC audio.
 - Provides 720p and 1080p maximum portrait canvases, adapting dimensions to avoid enlarging the source.
-- Offers full-frame letterboxing or centered cropping, 24/30/60 fps, and high-detail or smaller-file quality settings.
+- Offers full-frame letterboxing or centered cropping and 24/30/60 fps. Balanced is the default: bitrate-based compression keeps the selected dimensions with 128 kbps AAC audio. High detail prioritizes fine detail and can create much larger files.
 - Previews the export, downloads it, or opens the device share sheet when file sharing is supported.
 - Uses native WebCodecs in a dedicated worker when the browser and source codecs support it. Media is read from the local File without first copying the entire input into a WebAssembly filesystem.
 - Falls back to the existing FFmpeg worker when native conversion is unsupported or fails. Only this compatibility path downloads the pinned FFmpeg core from jsDelivr, about 31 MB. A native codec that stops advancing for 30 visible-tab seconds is terminated before fallback; cancellation also terminates the worker. No video is sent to an application server.
 
-For the measured before/after timings, checks, and output-size tradeoff, see [PERF.md](PERF.md). Keep the tab open during phone exports. Safari 26 and later provide the audio WebCodecs APIs, but codec support is still checked at runtime. Performance on a physical iPhone was not measured in this release.
+For the measured before/after timings, see [PERF.md](PERF.md); for the current size/quality comparison and compression budgets, see [compression validation](docs/COMPRESSION.md). Keep the tab open during phone exports. Safari 26 and later provide the audio WebCodecs APIs, but codec support is still checked at runtime. Performance on a physical iPhone was not measured in this release.
 
 ## Limits
 

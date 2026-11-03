@@ -155,7 +155,7 @@ export default function App() {
   const [framing, setFraming] = useState<Framing>("fit");
   const [resolution, setResolution] = useState(1080);
   const [fps, setFps] = useState(30);
-  const [quality, setQuality] = useState<"high" | "balanced">("high");
+  const [quality, setQuality] = useState<"high" | "balanced">("balanced");
   const [audio, setAudio] = useState(true);
   const [safeArea, setSafeArea] = useState(false);
   const [start, setStart] = useState(0);
@@ -1065,7 +1065,7 @@ export default function App() {
                     </div>
                     <div className="settings-row">
                       <label htmlFor="quality">
-                        Export quality<span>A little room for detail</span>
+                        Export quality<span>Detail and file size</span>
                       </label>
                       <select
                         id="quality"
@@ -1076,10 +1076,15 @@ export default function App() {
                           invalidate();
                         }}
                       >
+                        <option value="balanced">Balanced · smaller</option>
                         <option value="high">High detail</option>
-                        <option value="balanced">Smaller file</option>
                       </select>
                     </div>
+                    <p className="framing-note">
+                      {quality === "balanced"
+                        ? "Recommended for Stories and Status. Uses less data while keeping your selected resolution."
+                        : "Keeps more fine detail, especially in motion. Files can be much larger."}
+                    </p>
                     <div className="settings-row audio-row">
                       <label htmlFor="audio">
                         <SpeakerHighIcon size={18} /> Keep original audio

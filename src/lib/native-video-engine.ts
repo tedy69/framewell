@@ -1,25 +1,11 @@
 import type { Conversion, InputTrack } from "mediabunny";
 import {
   outputSize,
-  PRESETS,
+  nativeQualityOptions,
+  audioBitrate,
   type ExportSettings,
   type VideoMeta,
 } from "./video.ts";
-
-export function nativeVideoRate(meta: VideoMeta, settings: ExportSettings) {
-  const size = outputSize(meta, settings.resolution, settings.framing);
-  const ceiling = parseFloat(PRESETS[settings.platform].rate) * 1_000_000;
-  // Keep the existing destination bitrate budget when quantizer control is
-  // unavailable, instead of making the faster path a lower-quality preset.
-  if (settings.quality === "high") return ceiling;
-  return Math.min(
-    ceiling,
-    Math.max(
-      250_000,
-      Math.round(size.width * size.height * settings.fps * 0.1),
-    ),
-  );
-}
 
 export function retainsSelectedTracks<T>(
   used: readonly T[],
@@ -113,14 +99,14 @@ export async function exportVideoNative(
         // Let the browser select acceleration separately for decoding/encoding.
         // Forcing hardware rejects codecs such as VP8 on some Apple devices.
         hardwareAcceleration: "no-preference",
-        quality: new Quality({
-          quantizer: settings.quality === "high" ? 18 : 23,
-          bitrate: nativeVideoRate(meta, settings),
-          bitrateMode: "variable",
-        }),
+        quality: new Quality(nativeQualityOptions(meta, settings)),
       },
       audio: settings.audio
-        ? { codec: "aac", sampleRate: 48000, quality: new Quality(192_000) }
+        ? {
+            codec: "aac",
+            sampleRate: 48000,
+            quality: new Quality(audioBitrate(settings)),
+          }
         : { discard: true },
     });
     signal.throwIfAborted();

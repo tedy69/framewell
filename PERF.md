@@ -25,7 +25,7 @@ This fixture's repeated median was about 21 times faster. That is a synthetic de
 
 ### Quality and file-size limits
 
-The high-detail native target uses quantizer 18 where the browser supports it, with the destination's existing high-detail bitrate budget as the fallback. Smaller file uses quantizer 23 or a smaller bitrate budget. Quantizer-based encoding and FFmpeg CRF are different controls; their numerical values do not imply identical pixels or compression efficiency.
+At this initial native release, the high-detail target used quantizer 18 where supported, and Smaller file used quantizer 23 or a bitrate fallback. The subsequent [compression update](docs/COMPRESSION.md) makes bitrate-based Balanced the default. High detail still uses quantizer 18 where supported and can create large files. Quantizer-based encoding and FFmpeg CRF are different controls; their numerical values do not imply identical pixels or compression efficiency.
 
 For this deliberately detailed, moving test fixture, the original output was 8,395,087 bytes and the native output was 14,546,161 bytes. Native high-detail exports can therefore be larger. Native and compatibility encoders may produce different-looking results; no perceptual quality score or platform-processed upload quality was measured. The existing SDR/HDR limitation remains.
 

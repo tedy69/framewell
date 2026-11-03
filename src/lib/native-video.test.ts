@@ -1,11 +1,14 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import {
-  nativeVideoRate,
-  retainsSelectedTracks,
-} from "./native-video-engine.ts";
+import { retainsSelectedTracks } from "./native-video-engine.ts";
 import { exportVideoNative } from "./native-video.ts";
-import type { ExportSettings } from "./video.ts";
+import {
+  videoBitrate,
+  nativeQualityOptions,
+  audioBitrate,
+  exportArgs,
+  type ExportSettings,
+} from "./video.ts";
 import type { NativeVideoReply } from "./native-video.ts";
 const settings: ExportSettings = {
   platform: "instagram",
@@ -17,22 +20,51 @@ const settings: ExportSettings = {
   start: 0,
   end: 6,
 };
-test("native fallback bitrate retains the high-detail budget and scales smaller-file exports", () => {
+test("balanced compression scales with output pixels and fps within destination budgets", () => {
   const hd = { width: 1080, height: 1920, duration: 6 },
     small = { width: 720, height: 1280, duration: 6 };
-  assert.equal(nativeVideoRate(hd, settings), 10_000_000);
-  assert.equal(nativeVideoRate(small, settings), 10_000_000);
+  assert.equal(videoBitrate(hd, settings), 10_000_000);
+  assert.equal(videoBitrate(small, settings), 10_000_000);
   assert.ok(
-    nativeVideoRate(small, { ...settings, quality: "balanced" }) <
-      nativeVideoRate(hd, { ...settings, quality: "balanced" }),
+    videoBitrate(small, { ...settings, quality: "balanced" }) <
+      videoBitrate(hd, { ...settings, quality: "balanced" }),
   );
   assert.ok(
-    nativeVideoRate(small, { ...settings, quality: "balanced" }) <
-      nativeVideoRate(small, settings),
+    videoBitrate(small, { ...settings, quality: "balanced" }) <
+      videoBitrate(small, settings),
   );
   assert.ok(
-    nativeVideoRate(hd, { ...settings, platform: "whatsapp" }) <= 4_000_000,
+    videoBitrate(hd, { ...settings, platform: "whatsapp" }) <= 4_000_000,
   );
+  const balanced = { ...settings, quality: "balanced" as const };
+  assert.equal(videoBitrate(small, balanced), 4_000_000);
+  assert.equal(videoBitrate(hd, balanced), 8_000_000);
+  assert.equal(
+    videoBitrate(small, { ...balanced, platform: "whatsapp", resolution: 720, fps: 60 }),
+    4_000_000,
+  );
+  assert.ok(
+    videoBitrate(small, { ...balanced, fps: 60 }) > videoBitrate(small, balanced),
+  );
+  assert.equal(videoBitrate({ width: 64, height: 64, duration: 6 }, balanced), 250_000);
+});
+test("balanced native encoding cannot override the size budget with a quantizer; fallback shares rates", () => {
+  const balanced = { ...settings, quality: "balanced" as const };
+  assert.equal(nativeQualityOptions(meta, balanced).quantizer, undefined);
+  assert.equal(nativeQualityOptions(meta, settings).quantizer, 18);
+  assert.equal(nativeQualityOptions(meta, balanced).bitrateMode, "variable");
+  const args = exportArgs("source.mp4", meta, balanced);
+  assert.equal(
+    args[args.indexOf("-maxrate") + 1],
+    String(videoBitrate(meta, balanced)),
+  );
+  assert.equal(
+    args[args.indexOf("-bufsize") + 1],
+    String(videoBitrate(meta, balanced) * 2),
+  );
+  assert.equal(args[args.indexOf("-b:a") + 1], String(audioBitrate(balanced)));
+  assert.equal(audioBitrate(balanced), 128_000);
+  assert.equal(audioBitrate(settings), 192_000);
 });
 test("a native conversion may not silently discard selected video or source audio", () => {
   const video = {},

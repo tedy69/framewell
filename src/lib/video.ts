@@ -22,6 +22,7 @@ export const PRESETS = {
     description: "A clean, vertical canvas for your stories.",
     resolution: 1080,
     rate: "10M",
+    compactRate: 8_000_000,
     note: "Choose the highest upload quality available in Instagram. Upload the exported file directly from your gallery.",
   },
   whatsapp: {
@@ -30,6 +31,7 @@ export const PRESETS = {
     description: "A lighter file for your everyday updates.",
     resolution: 720,
     rate: "4M",
+    compactRate: 4_000_000,
     note: "WhatsApp does not support HD media for Status and may reduce quality. This preset cannot bypass that compression.",
   },
   tiktok: {
@@ -38,6 +40,7 @@ export const PRESETS = {
     description: "Keep the detail in your next short video.",
     resolution: 1080,
     rate: "12M",
+    compactRate: 10_000_000,
     note: "Start with the original recording and upload this MP4 directly. TikTok applies its own processing after upload.",
   },
 } as const;
@@ -72,6 +75,34 @@ export function validateRange(start: number, end: number, duration: number) {
   if (end - start > 180)
     return "Export up to 3 minutes at a time. Shorten the clip to continue.";
   return null;
+}
+export function videoBitrate(meta: VideoMeta, settings: ExportSettings) {
+  const preset = PRESETS[settings.platform];
+  if (settings.quality === "high") return parseFloat(preset.rate) * 1_000_000;
+  const { width, height } = outputSize(meta, settings.resolution, settings.framing);
+  // 4 Mbps at 720p/30, scaled to the pixels actually exported. Higher frame
+  // rates share detail between frames, so they need less than a linear increase.
+  return Math.min(
+    preset.compactRate,
+    Math.max(
+      250_000,
+      Math.round(
+        4_000_000 * ((width * height) / (720 * 1280)) * Math.sqrt(settings.fps / 30),
+      ),
+    ),
+  );
+}
+export function audioBitrate(settings: ExportSettings) {
+  return settings.quality === "high" ? 192_000 : 128_000;
+}
+export function nativeQualityOptions(meta: VideoMeta, settings: ExportSettings) {
+  return {
+    // An explicit quantizer overrides the bitrate. Only High detail opts into
+    // that unbounded size tradeoff; Balanced must use bitrate-based encoding.
+    ...(settings.quality === "high" ? { quantizer: 18 } : {}),
+    bitrate: videoBitrate(meta, settings),
+    bitrateMode: "variable" as const,
+  };
 }
 export function exportArgs(
   input: string,
@@ -108,13 +139,13 @@ export function exportArgs(
     "-crf",
     settings.quality === "high" ? "18" : "23",
     "-maxrate",
-    PRESETS[settings.platform].rate,
+    String(videoBitrate(meta, settings)),
     "-bufsize",
-    "24M",
+    String(videoBitrate(meta, settings) * 2),
     "-pix_fmt",
     "yuv420p",
     ...(settings.audio
-      ? ["-c:a", "aac", "-b:a", "192k", "-ar", "48000"]
+      ? ["-c:a", "aac", "-b:a", String(audioBitrate(settings)), "-ar", "48000"]
       : ["-an"]),
     "-map_metadata",
     "-1",
