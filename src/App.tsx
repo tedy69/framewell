@@ -26,6 +26,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import PhotoStudio from "./PhotoStudio";
+import { exportVideoNative } from "./lib/native-video";
 import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
@@ -105,10 +106,11 @@ function Guide({ children }: { children: React.ReactNode }) {
           </p>
           <h3>What happens to your video?</h3>
           <p>
-            Your files stay on this device. Videos use FFmpeg in browser memory;
-            photos use a local sRGB canvas. The video export engine is
-            downloaded from jsDelivr on first video export (about 31 MB). Photos
-            need no engine download. Reloading clears your working session.
+            Your files stay on this device. Videos use your browser’s built-in
+            encoder when supported. Otherwise, a compatibility engine runs
+            locally and is downloaded from jsDelivr on its first use (about 31
+            MB). Photos use a local sRGB canvas and need no video engine.
+            Reloading clears your working session.
           </p>
           <h3>Practical limits</h3>
           <p>
@@ -356,11 +358,64 @@ export default function App() {
     setJob({
       phase: "loading",
       percent: 0,
-      label: ffmpeg.current?.loaded
-        ? "Reading your video…"
-        : "Loading the export engine…",
+      label: "Checking your video…",
     });
+    const complete = (contents: BlobPart) => {
+      if (id !== operation.current) return;
+      const cleanName = selectedSource.file.name
+        .replace(/\.[^.]+$/, "")
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 80);
+      const file = new File(
+        [contents],
+        `${cleanName}-${settings.platform}.mp4`,
+        { type: "video/mp4" },
+      );
+      setResult({
+        file,
+        url: URL.createObjectURL(file),
+        ...outputSize(selectedSource, settings.resolution, settings.framing),
+        duration: settings.end - settings.start,
+        platform: settings.platform,
+      });
+      setView("export");
+      setPosition(0);
+      setNotice("Your MP4 is ready. Preview it, then save it to your device.");
+    };
     try {
+      let lastProgress = -Infinity;
+      const native = await exportVideoNative(
+        selectedSource.file,
+        selectedSource,
+        settings,
+        abort.signal,
+        (fraction) => {
+          const now = performance.now();
+          if (
+            id === operation.current &&
+            (now - lastProgress >= 100 || fraction === 1)
+          ) {
+            lastProgress = now;
+            setJob({
+              phase: "encoding",
+              percent: Math.min(99, Math.max(0, Math.round(fraction * 100))),
+              label: "Preparing your MP4…",
+            });
+          }
+        },
+      );
+      if (id !== operation.current) return;
+      if (native) {
+        complete(native);
+        return;
+      }
+      setJob({
+        phase: "loading",
+        percent: 0,
+        label: ffmpeg.current?.loaded
+          ? "Reading your video…"
+          : "Loading the compatibility engine…",
+      });
       if (!ffmpeg.current?.loaded) {
         const { FFmpeg } = await import("@ffmpeg/ffmpeg");
         if (id !== operation.current) return;
@@ -439,32 +494,7 @@ export default function App() {
         if (id !== operation.current) return;
         if (typeof data === "string" || data.byteLength === 0)
           throw new Error("The export was empty. Please try another video.");
-        const cleanName = selectedSource.file.name
-          .replace(/\.[^.]+$/, "")
-          .replace(/[^a-zA-Z0-9_-]/g, "_")
-          .slice(0, 80);
-        const file = new File(
-          [new Uint8Array(data)],
-          `${cleanName}-${settings.platform}.mp4`,
-          { type: "video/mp4" },
-        );
-        const dimensions = outputSize(
-          selectedSource,
-          settings.resolution,
-          settings.framing,
-        );
-        setResult({
-          file,
-          url: URL.createObjectURL(file),
-          ...dimensions,
-          duration: settings.end - settings.start,
-          platform: settings.platform,
-        });
-        setView("export");
-        setPosition(0);
-        setNotice(
-          "Your MP4 is ready. Preview it, then save it to your device.",
-        );
+        complete(new Uint8Array(data));
       } finally {
         engine.off("progress", progress);
         engine.off("log", log);
@@ -1129,9 +1159,11 @@ export default function App() {
                       </Button>
                     )}
                     <p className="export-footnote">
-                      {source
-                        ? "Processed here, in your browser."
-                        : "Add a video to begin your export."}
+                      {job
+                        ? "Keep this tab open while exporting."
+                        : source
+                          ? "Processed here, in your browser."
+                          : "Add a video to begin your export."}
                     </p>
                   </div>
                 </section>

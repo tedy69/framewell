@@ -39,9 +39,12 @@ Pages sites are public by default unless Cloudflare Access is separately configu
 - Reads a local browser-playable MP4, MOV, or WebM up to 250 MB.
 - Exports a selected clip up to 180 seconds as H.264 MP4 with optional AAC audio.
 - Provides 720p and 1080p maximum portrait canvases, adapting dimensions to avoid enlarging the source.
-- Offers full-frame letterboxing or centered cropping, 24/30/60 fps, and two CRF quality settings.
+- Offers full-frame letterboxing or centered cropping, 24/30/60 fps, and high-detail or smaller-file quality settings.
 - Previews the export, downloads it, or opens the device share sheet when file sharing is supported.
-- Processes media in browser memory with a single-thread FFmpeg WebAssembly worker. The first export downloads the pinned FFmpeg core from jsDelivr, about 31 MB. No video is sent to an application server.
+- Uses native WebCodecs in a dedicated worker when the browser and source codecs support it. Media is read from the local File without first copying the entire input into a WebAssembly filesystem.
+- Falls back to the existing FFmpeg worker when native conversion is unsupported or fails. Only this compatibility path downloads the pinned FFmpeg core from jsDelivr, about 31 MB. A native codec that stops advancing for 30 visible-tab seconds is terminated before fallback; cancellation also terminates the worker. No video is sent to an application server.
+
+For the measured before/after timings, checks, and output-size tradeoff, see [PERF.md](PERF.md). Keep the tab open during phone exports. Safari 26 and later provide the audio WebCodecs APIs, but codec support is still checked at runtime. Performance on a physical iPhone was not measured in this release.
 
 ## Limits
 
@@ -52,3 +55,5 @@ Exports are for manual posting in the destination app. This project does not con
 The interface uses a dark editing studio with a warm orange accent. shadcn/ui was selected from the [Style UI catalog](https://style.ai.id/ui-components). Button, tabs, switch, and dialog components are adapted from the official shadcn/ui new-york registry and backed by Radix primitives. Typography is self-hosted Plus Jakarta Sans under the included OFL license. Action icons are Phosphor. See [DESIGN.md](DESIGN.md) for the design reasons, [photo verification](docs/PHOTO-VALIDATION.md) for the photo extension and video regression checks, and [initial video verification](docs/VALIDATION.md) for the baseline.
 
 Sources: [Style UI](https://github.com/miqdadbadjuber/style-ui), [shadcn/ui](https://ui.shadcn.com), [FFmpeg usage](https://ffmpegwasm.netlify.app/docs/getting-started/usage/), [TikTok formats](https://developers.tiktok.com/docs/en/content-posting-api-media-transfer-guide), [WhatsApp HD limitations](https://faq.whatsapp.com/759301289012856).
+
+Native conversion uses unmodified [Mediabunny 1.65.1](https://www.npmjs.com/package/mediabunny/v/1.65.1), under MPL-2.0. Its [source is available in the package](https://unpkg.com/mediabunny@1.65.1/src/) and [upstream repository](https://github.com/Vanilagy/mediabunny); a copy of its license is included in [docs/MEDIABUNNY-LICENSE.txt](docs/MEDIABUNNY-LICENSE.txt). Safari API support: [WebKit's Safari 26 release notes](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/).
